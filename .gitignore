@@ -1,0 +1,4 @@
+cli.exe
+a.out
+*.db
+*.slowdb
