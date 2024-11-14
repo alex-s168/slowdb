@@ -10,6 +10,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
  */ 
 
+#include <stdio.h>
 #define SLOWDB_IMPL
 #include "slowdb.h"
 #include <stdbool.h>
@@ -23,6 +24,24 @@ static bool is_c_str(unsigned char * data, int len)
             return false;
     return true;
 }
+
+static int r_info(slowdb* db, int argc, char** argv)
+{
+    if (argc != 0) {
+        fprintf(stderr, "invalid amount of arguments for op\n");
+        return 1;
+    }
+
+    slowdb_stats stats;
+    slowdb_stats_get(db, &stats);
+
+    printf("alive entries:    %zu (%zu B)\n", stats.num_alive_ents, stats.bytes_alive_ents);
+    printf("dead entries:     %zu (%zu B)\n", stats.num_dead_ents, stats.bytes_dead_ents);
+    printf("hash collissions: %zu\n", stats.num_hash_coll);
+
+    return 0;
+}
+
 
 static int r_list(slowdb* db, int argc, char** argv)
 {
@@ -50,6 +69,9 @@ static int r_list(slowdb* db, int argc, char** argv)
         if (is_c_str(val, vallen))
             printf("\"%s\"\n", val);
         else printf("<binary>\n");
+
+        free(key);
+        free(val);
     }
 
     return 0;
@@ -112,7 +134,8 @@ int main(int argc, char** argv)
     if (argc < 3) {
         fprintf(stderr, "usage: slowdb [operation] [file] args...\n");
         fprintf(stderr, "operations:\n");
-        fprintf(stderr, "   create             if the db does not exists, creates it");
+        fprintf(stderr, "   create             if the db does not exists, creates it\n");
+        fprintf(stderr, "   info               view information about the database\n");
         fprintf(stderr, "   list               list all entries in the database\n");
         fprintf(stderr, "   get  [key]         find a specific entry\n");
         fprintf(stderr, "   rm   [key]         remove a specific entry\n");
@@ -132,6 +155,8 @@ int main(int argc, char** argv)
 
     if (!strcmp(op, "list"))
         status = r_list(db, argc - 3, argv + 3);
+    else if (!strcmp(op, "info"))
+        status = r_info(db, argc - 3, argv + 3);
     else if (!strcmp(op, "get"))
         status = r_get(db, argc - 3, argv + 3);
     else if (!strcmp(op, "rm"))
