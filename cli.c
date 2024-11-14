@@ -27,6 +27,8 @@ static bool is_c_str(unsigned char * data, int len)
 
 static int r_info(slowdb* db, int argc, char** argv)
 {
+    (void) argv;
+
     if (argc != 0) {
         fprintf(stderr, "invalid amount of arguments for op\n");
         return 1;
@@ -45,6 +47,8 @@ static int r_info(slowdb* db, int argc, char** argv)
 
 static int r_list(slowdb* db, int argc, char** argv)
 {
+    (void) argv;
+
     if (argc != 0) {
         fprintf(stderr, "invalid amount of arguments for op\n");
         return 1;

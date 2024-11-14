@@ -74,11 +74,24 @@ void slowdb_stats_get(slowdb* db, slowdb_stats* out);
 #include <stdlib.h>
 #include <assert.h>
 
+struct slowdb_hashtab_ent {
+    int32_t hash;
+    uint16_t entid;
+};
+
+struct slowdb_hashtab_bucket {
+    struct slowdb_hashtab_ent * items;
+    size_t count;
+};
+
 struct slowdb {
     FILE* fp;
 
     size_t*  ents;
-    int32_t* ents_hashes;
+
+    size_t hashtab_buckets;
+    struct slowdb_hashtab_bucket * hashtab;
+
     size_t   ents_len;
 };
 
@@ -109,9 +122,14 @@ static void slowdb__dap(slowdb* db, size_t where, int32_t hash)
         realloc(db->ents, sizeof(size_t) * (db->ents_len + 1));
     db->ents[db->ents_len] = where;
 
-    db->ents_hashes = (int32_t*)
-        realloc(db->ents_hashes, sizeof(int32_t) * (db->ents_len + 1));
-    db->ents_hashes[db->ents_len] = hash;
+    struct slowdb_hashtab_bucket * bucket = &db->hashtab[((size_t ) hash) % db->hashtab_buckets];
+
+    struct slowdb_hashtab_ent htent;
+    htent.hash = hash;
+    htent.entid = db->ents_len;
+    bucket->items = (struct slowdb_hashtab_ent *)
+        realloc(bucket->items, sizeof(struct slowdb_hashtab_ent) * (bucket->count + 1));
+    bucket->items[bucket->count ++] = htent;
 
     db->ents_len ++;
 }
@@ -126,12 +144,21 @@ slowdb *slowdb_open(const char *filename)
     slowdb* db = (slowdb*) malloc(sizeof(slowdb));
     if (db == NULL) return NULL;
 
-    db->fp = fdopen(open(filename, O_RDWR | O_CREAT, 0666), "wb+");
+    int fd = open(filename, O_RDWR | O_CREAT, 0666);
+    db->fp = (fd == -1) ? NULL : fdopen(fd, "wb+");
     if (db->fp == NULL) {
         free(db);
         return NULL;
     }
     rewind(db->fp);
+
+    db->ents = NULL;
+    db->ents_len = 0;
+
+    db->hashtab_buckets = 8;
+    db->hashtab = (struct slowdb_hashtab_bucket *)
+        malloc(db->hashtab_buckets * sizeof(struct slowdb_hashtab_bucket));
+    memset(db->hashtab, 0, db->hashtab_buckets * sizeof(struct slowdb_hashtab_bucket));
 
     struct slowdb_header header;
     fread(&header, sizeof(header), 1, db->fp);
@@ -139,9 +166,6 @@ slowdb *slowdb_open(const char *filename)
         rewind(db->fp);
         memcpy(header.magic, slowdb_header_magic, 8);
         fwrite(&header, sizeof(header), 1, db->fp);
-        db->ents = NULL;
-        db->ents_hashes = NULL;
-        db->ents_len = 0;
     }
     else {
         if ( memcmp(header.magic, slowdb_header_magic, 8) ){
@@ -150,9 +174,6 @@ slowdb *slowdb_open(const char *filename)
             return NULL;
         }
 
-        db->ents_len = 0;
-        db->ents = NULL;
-        db->ents_hashes = NULL;
         while (1)
         {
             size_t where = ftell(db->fp);
@@ -179,17 +200,29 @@ slowdb *slowdb_open(const char *filename)
     return db;
 }
 
+// 0 = no next 
+#define slowdb__iterPotentialEnt(db, hashh, idVar, fn) \
+{ \
+    struct slowdb_hashtab_bucket bucket = \
+        (db)->hashtab[((size_t) hashh) % (db)->hashtab_buckets]; \
+\
+    for (size_t __buck = 0; __buck < bucket.count; __buck ++) \
+    { \
+        if (bucket.items[__buck].hash == (hashh)) \
+        { \
+            uint16_t idVar = bucket.items[__buck].entid; \
+            fn; \
+        } \
+    } \
+}
+
 unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen, int *vallen)
 {
     int32_t keyhs = slowdb__hash(key, keylen);
 
     int found = 0;
-    for (size_t i = 0; i < instance->ents_len; i ++)
-    {
-        if (keyhs != instance->ents_hashes[i])
-            continue;
-
-        fseek(instance->fp, instance->ents[i], SEEK_SET);
+    slowdb__iterPotentialEnt(instance, keyhs, entid, ({
+        fseek(instance->fp, instance->ents[entid], SEEK_SET);
         struct slowdb_ent_header header;
         fread(&header, sizeof(header), 1, instance->fp);
         if (!header.valid || header.key_len != keylen)
@@ -203,7 +236,7 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
             break;
         }
         free(k);
-    }
+    }));
 
     if (vallen)
         *vallen = found;
@@ -221,12 +254,8 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
 void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen, const unsigned char *val, int vallen)
 {
     int32_t keyhs = slowdb__hash(key, keylen);
-    for (size_t i = 0; i < instance->ents_len; i ++)
-    {
-        if (keyhs != instance->ents_hashes[i])
-            continue;
-
-        fseek(instance->fp, instance->ents[i], SEEK_SET);
+    slowdb__iterPotentialEnt(instance, keyhs, entid, ({
+        fseek(instance->fp, instance->ents[entid], SEEK_SET);
         struct slowdb_ent_header header;
         fread(&header, sizeof(header), 1, instance->fp);
         if (!header.valid || header.key_len != keylen)
@@ -241,7 +270,7 @@ void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen,
             return;
         }
         free(k);
-    }
+    }));
 
     (void) slowdb_put(instance, key, keylen, val, vallen);
 }
@@ -249,11 +278,8 @@ void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen,
 void slowdb_remove(slowdb *instance, const unsigned char *key, int keylen)
 {
     int32_t keyhs = slowdb__hash(key, keylen);
-    for (size_t i = 0; i < instance->ents_len; i ++)
-    {
-        if (keyhs != instance->ents_hashes[i])
-            continue;
-        fseek(instance->fp, instance->ents[i], SEEK_SET);
+    slowdb__iterPotentialEnt(instance, keyhs, entid, ({
+        fseek(instance->fp, instance->ents[entid], SEEK_SET);
         struct slowdb_ent_header header;
         fread(&header, sizeof(header), 1, instance->fp);
         if (!header.valid || header.key_len != keylen)
@@ -262,14 +288,14 @@ void slowdb_remove(slowdb *instance, const unsigned char *key, int keylen)
         if (k == NULL) continue;
         fread(k, 1, header.key_len, instance->fp);
         if (!memcmp(key, k, header.key_len)) {
-            fseek(instance->fp, instance->ents[i], SEEK_SET);
+            fseek(instance->fp, instance->ents[entid], SEEK_SET);
             header.valid = 0;
             fwrite(&header, sizeof(header), 1, instance->fp);
             free(k);
             break;
         }
         free(k);
-    }
+    }));
 }
 
 void slowdb_put(slowdb *instance, const unsigned char *key, int keylen, const unsigned char *val, int vallen)
@@ -294,7 +320,9 @@ void slowdb_close(slowdb *instance)
 {
     fclose(instance->fp);
     free(instance->ents);
-    free(instance->ents_hashes);
+    for (size_t i = 0; i < instance->hashtab_buckets; i ++)
+        free(instance->hashtab[i].items);
+    free(instance->hashtab);
     free(instance);
 }
 
@@ -363,16 +391,14 @@ void slowdb_stats_get(slowdb* db, slowdb_stats* out)
         fseek(db->fp, eh.key_len + eh.data_len, SEEK_CUR);
     }
 
-    for (size_t i = 0; i < db->ents_len; i ++)
+    for (size_t i = 0; i < db->hashtab_buckets; i ++)
     {
-        int32_t hash = db->ents_hashes[i];
+        struct slowdb_hashtab_bucket bucket = db->hashtab[i];
 
-        for (size_t j = 0; j < i; j ++) {
-            if (db->ents_hashes[j] == hash) {
-                out->num_hash_coll ++;
-                break;
-            }
-        }
+        for (size_t j = 0; j < bucket.count; j ++)
+            for (size_t k = 0; k < j; k ++)
+                if (bucket.items[k].hash == bucket.items[j].hash)
+                    out->num_hash_coll ++;
     }
 }
 
