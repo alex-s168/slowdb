@@ -8,7 +8,7 @@ expect()
     fi
 }
 
-rm test.db
+[[ -f test.db ]] && rm test.db
 
 ./cli.exe create test.db
 
