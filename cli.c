@@ -122,8 +122,42 @@ static int r_put(slowdb* db, int argc, char** argv)
     return 0;
 }
 
+static int r_puti(slowdb* db, int argc, char** argv)
+{
+    if (argc != 1) {
+        fprintf(stderr, "invalid amount of arguments for op\n");
+        return 1;
+    }
+
+    slowdb_remove(db,
+            (const unsigned char *) argv[0], strlen(argv[0]) + 1);
+
+    size_t strcap = 128;
+    char * str = malloc(strcap);
+    size_t writer = 0;
+
+    int c;
+    while ((c = fgetc(stdin)) != EOF) {
+        if (writer >= strcap) {
+            strcap += 128;
+            str = realloc(str, strcap);
+        }
+        str[writer++] = c;
+    }
+
+    slowdb_put(db,
+            (const unsigned char *) argv[0], strlen(argv[0]) + 1,
+            (const unsigned char *) str, writer);
+
+    return 0;
+}
+
+
 int main(int argc, char** argv)
 {
+    freopen(NULL, "rb", stdin);
+    freopen(NULL, "wb", stdout);
+
     if (argc < 3) {
         fprintf(stderr, "usage: slowdb [operation] [file] args...\n");
         fprintf(stderr, "operations:\n");
@@ -132,7 +166,8 @@ int main(int argc, char** argv)
         fprintf(stderr, "   list               list all entries in the database\n");
         fprintf(stderr, "   get  [key]         find a specific entry\n");
         fprintf(stderr, "   rm   [key]         remove a specific entry\n");
-        fprintf(stderr, "   put  [key] [value] add or replace a entry\n");
+        fprintf(stderr, "   put  [key] [value] add or replace an entry\n");
+        fprintf(stderr, "   puti [key]         add or replace an entry with a binary file read from stdin\n");
         exit(1);
     }
 
@@ -156,6 +191,8 @@ int main(int argc, char** argv)
         status = r_rm(db, argc - 3, argv + 3);
     else if (!strcmp(op, "put"))
         status = r_put(db, argc - 3, argv + 3);
+    else if (!strcmp(op, "puti"))
+        status = r_puti(db, argc - 3, argv + 3);
     else if (!strcmp(op, "create"))
         status = 0;
     else {

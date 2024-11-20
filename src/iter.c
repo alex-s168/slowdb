@@ -34,8 +34,13 @@ unsigned char * slowdb_iter_get_val(slowdb_iter* iter, int* lenout)
     unsigned char * v = (unsigned char *) malloc(header.data_len);
     if (v == NULL) return NULL;
     fread(v, 1, header.data_len, iter->_db->fp);
-    if (lenout) *lenout = header.data_len;
-    return v;
+
+    size_t decomp;
+    unsigned char * actual = slowdb__decomp(header.compress, v, header.data_len, &decomp);
+    if (actual == NULL) return NULL;
+    free(v);
+    if (lenout) *lenout = decomp;
+    return actual;
 }
 
 // returns 1 if there was a next

@@ -5,8 +5,10 @@
 
 typedef struct slowdb slowdb;
 
+// TODO: use size_t everywhere
+
 /** add a new record to the database. does NOT overwrite old records */
-void slowdb_put(slowdb *instance, const unsigned char *key, int keylen, const unsigned char *val, int vallen);
+void slowdb_put(slowdb *instance, const unsigned char *key, size_t keylen, const unsigned char *val, size_t vallen);
 
 /**
  * Get a HEAP ALLOCATED pointer to an existing record. 

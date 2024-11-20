@@ -42,6 +42,7 @@ extern "C" {
 
 #endif
 
+#define strpack_safe
 #define strpack_full
 
 #if defined(strpack_full)

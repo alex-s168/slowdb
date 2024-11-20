@@ -43,14 +43,20 @@ typedef enum : char {
 #if _SLOWDB_WITH_UNISHOX2
     COMPRESS_UNISHOX2 = 2,
 #endif 
+#if _SLOWDB_WITH_LZ4
+    COMPRESS_LZ4 = 3,
+#endif 
 } slowdb__compress;
 
 typedef struct {
     /** SLOWDB__ENT_MAGIC | valid */
     char valid;
+    /** only for data, not key */
     slowdb__compress compress;
 
     uint16_t key_len;
+
+    /** size of the data in compressed form */
     uint16_t data_len;
 } __attribute__((packed)) slowdb_ent_header;
 
@@ -67,8 +73,8 @@ void slowdb__add_ent_idx(slowdb* db, size_t where, int32_t hash);
 static int slowdb__iter_seek_and_get_header(slowdb_iter* iter, slowdb_ent_header* header);
 
 slowdb__compress slowdb__select_compress(void const* data, size_t len);
-size_t slowdb__comp(slowdb__compress algo, void* dest, void const* src, size_t len);
-size_t slowdb__decomp(slowdb__compress algo, void* dest, void const* src, size_t len);
+void * slowdb__comp(slowdb__compress algo, void const* src, size_t len, size_t *actual_len_out);
+void * slowdb__decomp(slowdb__compress algo, void const* src, size_t len, size_t *actual_len_out);
 
 #define malloca(dest, size) { if ((size) > 1024) dest = malloc((size)); else { char buf[size]; dest = (void*) (&buf); }  }
 #define freea(var, size)    { if ((size) > 1024) free((var)); }

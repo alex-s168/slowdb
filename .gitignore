@@ -3,3 +3,5 @@ a.out
 *.db
 *.slowdb
 build/
+.check*
+config.*

@@ -4,6 +4,7 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
 {
     int32_t keyhs = slowdb__hash(key, keylen);
 
+    slowdb__compress comp;
     int found = 0;
     slowdb__iterPotentialEnt(instance, keyhs, entid, ({
         fseek(instance->fp, instance->ents[entid], SEEK_SET);
@@ -16,25 +17,41 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
         fread(k, 1, header.key_len, instance->fp);
         if (!memcmp(key, k, header.key_len)) {
             found = header.data_len;
+            comp = header.compress;
             free(k);
             break;
         }
         free(k);
     }));
 
-    if (vallen)
-        *vallen = found;
-
     if (!found) return NULL;
 
     unsigned char * res = (unsigned char*) malloc(found);
     if (res == NULL) return NULL;
-
     fread(res, 1, found, instance->fp);
 
-    return res;
+    size_t decomp;
+    unsigned char * actual = slowdb__decomp(comp, res, found, &decomp);
+    if (actual == NULL) return NULL;
+    if (vallen)
+        *vallen = decomp;
+    free(res);
+    return actual;
 }
 
+static void slowdb__rm(slowdb *instance, size_t where)
+{
+    fseek(instance->fp, where, SEEK_SET);
+    slowdb_ent_header header;
+    fread(&header, 1, sizeof(header), instance->fp);
+    if (!(header.valid & 1))
+        return;
+    fseek(instance->fp, where, SEEK_SET);
+    header.valid = (char) SLOWDB__ENT_MAGIC;
+    fwrite(&header, 1, sizeof(header), instance->fp);
+}
+
+// TODO: get rid of that in the future because of compression
 void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen, const unsigned char *val, int vallen)
 {
     int32_t keyhs = slowdb__hash(key, keylen);
@@ -48,10 +65,17 @@ void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen,
         if (k == NULL) continue;
         fread(k, 1, header.key_len, instance->fp);
         if (!memcmp(key, k, header.key_len)) {
-            assert(header.data_len == vallen && "cannot slowdb_replaceOrPut() with different vallen than before");
-            fwrite(val, 1, vallen, instance->fp);
             free(k);
-            return;
+            if (header.compress != COMPRESS_NONE) {
+                // because compression might make new data len != old data len, remove this entry and add new
+                slowdb__rm(instance, instance->ents[entid]);
+                break;
+            }
+            else {
+                assert(header.data_len == vallen && "cannot slowdb_replaceOrPut() with different vallen than before");
+                fwrite(val, 1, vallen, instance->fp);
+                return;
+            }
         }
         free(k);
     }));
@@ -72,9 +96,7 @@ void slowdb_remove(slowdb *instance, const unsigned char *key, int keylen)
         if (k == NULL) continue;
         fread(k, 1, header.key_len, instance->fp);
         if (!memcmp(key, k, header.key_len)) {
-            fseek(instance->fp, instance->ents[entid], SEEK_SET);
-            header.valid = (char) SLOWDB__ENT_MAGIC;
-            fwrite(&header, 1, sizeof(header), instance->fp);
+            slowdb__rm(instance, instance->ents[entid]);
             free(k);
             break;
         }
@@ -82,7 +104,7 @@ void slowdb_remove(slowdb *instance, const unsigned char *key, int keylen)
     }));
 }
 
-void slowdb_put(slowdb *instance, const unsigned char *key, int keylen, const unsigned char *val, int vallen)
+static size_t slowdb__find_free_space(slowdb* instance, size_t keylen, size_t vallen)
 {
 	size_t where;
 
@@ -102,12 +124,23 @@ void slowdb_put(slowdb *instance, const unsigned char *key, int keylen, const un
 		}
 	}
 
+    return where;
+}
+
+void slowdb_put(slowdb *instance, const unsigned char *key, size_t keylen, const unsigned char *val, size_t vallen)
+{
+    slowdb__compress algo = slowdb__select_compress(val, vallen);
+    val = slowdb__comp(algo, val, vallen, &vallen);
+    if (val == NULL) return;
+
+    size_t where = slowdb__find_free_space(instance, keylen, vallen);
 	fseek(instance->fp, where, SEEK_SET);
 
     slowdb_ent_header header;
     header.key_len = keylen;
     header.data_len = vallen;
     header.valid = (char) (SLOWDB__ENT_MAGIC | 1);
+    header.compress = algo;
 
     fwrite(&header, 1, sizeof(header), instance->fp);
     fwrite(key, 1, header.key_len, instance->fp);
@@ -115,4 +148,6 @@ void slowdb_put(slowdb *instance, const unsigned char *key, int keylen, const un
 
     int32_t hash = slowdb__hash(key, header.key_len);
     slowdb__add_ent_idx(instance, where, hash);
+
+    free((unsigned char *) val);
 }

@@ -8,6 +8,6 @@ Key-Value storage in C:
 - tiny
 - hash table of keys to file offsets
 - persistent: writes are instantly written to the disk
+- compression: automatically selects between strpakck, unishox2, and LZ4 compression
 - NOT concurrent
-- header-only
-- MIT-licenced
+- MIT-licenced (except for when you use a specific optional compression library)
