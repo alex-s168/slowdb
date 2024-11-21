@@ -26,16 +26,6 @@ typedef enum : char {
 #endif 
 } slowdb__compress;
 
-typedef struct {
-    int32_t hash;
-    size_t  where;
-} slowdb_hashtab_ent;
-
-typedef struct {
-    slowdb_hashtab_ent * items;
-    size_t count;
-} slowdb_hashtab_bucket;
-
 #if __SIZE_WIDTH__ >= 64
 # define half_size_t uint32_t
 #elif __SIZE_WIDTH__ >= 32 
@@ -43,6 +33,22 @@ typedef struct {
 #else 
 # define half_size_t uint8_t
 #endif
+
+#define expand(x,y) y(x)
+#define uint(bits) uint##bits##_t
+
+#define SLOWDB__HASH_BITS 64
+#define slowdb__hash_t expand(SLOWDB__HASH_BITS, uint)
+
+typedef struct {
+    slowdb__hash_t hash;
+    size_t  where;
+} slowdb_hashtab_ent;
+
+typedef struct {
+    slowdb_hashtab_ent * items;
+    size_t count;
+} slowdb_hashtab_bucket;
 
 typedef struct {
     half_size_t bucket;
@@ -82,7 +88,7 @@ typedef struct {
     char magic[sizeof(slowdb__header_magic)];
 } __attribute__((packed)) slowdb_header;
 
-int32_t slowdb__hash(const unsigned char * data, int len);
+slowdb__hash_t slowdb__hash(const unsigned char * data, int len);
 void slowdb__add_ent_idx(slowdb* db, size_t where, int32_t hash);
 void slowdb__rem_ent_idx(slowdb* db, slowdb__ent_id id);
 
