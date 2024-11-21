@@ -36,27 +36,22 @@ slowdb *slowdb_open(const char *filename);
  */
 void slowdb_close(slowdb *instance);
 
-typedef struct {
-    /** INTERNAL! */
-    slowdb *_db;
-    /** INTERNAL! */
-    size_t _ent_id;
-} slowdb_iter;
+typedef struct slowdb_iter slowdb_iter;
 
 /** 
  * creates a new iterator over data in the database.
  * there can be multiple iterators at the same time, as long as they do NOT run in parallel.
+ * iter has to be closed
  */
-slowdb_iter slowdb_iter_new(slowdb* slowdb);
+slowdb_iter* slowdb_iter_new(slowdb* slowdb);
 
-/** if this returns NULL, it means that the current item is not valid and you need to go to the next item */
 unsigned char * slowdb_iter_get_key(slowdb_iter* iter, int* lenout);
-
-/** if this returns NULL, it means that the current item is not valid and you need to go to the next item */
 unsigned char * slowdb_iter_get_val(slowdb_iter* iter, int* lenout);
 
 /** returns 1 if there was a next; ALSO HAS TO BE CALLED BEFORE THE FIRST ELEM */
 int slowdb_iter_next(slowdb_iter* iter);
+
+void slowdb_iter_delete(slowdb_iter* iter);
 
 typedef struct {
     size_t num_alive_ents;

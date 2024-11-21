@@ -13,10 +13,7 @@ slowdb *slowdb_open(const char *filename)
     }
     rewind(db->fp);
 
-    db->ents = NULL;
-    db->ents_len = 0;
-
-    db->hashtab_buckets = 16;
+    db->hashtab_buckets = 32;
     db->hashtab = (slowdb_hashtab_bucket *)
         malloc(db->hashtab_buckets * sizeof(slowdb_hashtab_bucket));
     if (db->hashtab == NULL) {
@@ -27,6 +24,7 @@ slowdb *slowdb_open(const char *filename)
     memset(db->hashtab, 0, db->hashtab_buckets * sizeof(slowdb_hashtab_bucket));
 
     slowdb_header header;
+    db->next_new = sizeof(header);
 	fread(&header, 1, sizeof(header), db->fp);
     if ( feof(db->fp) ) {
         fseek(db->fp, 0, SEEK_SET);
@@ -78,6 +76,8 @@ slowdb *slowdb_open(const char *filename)
 
             fseek(db->fp, where + sizeof(slowdb_ent_header) + eh.data_len + eh.key_len, SEEK_SET);
         }
+
+        db->next_new = ftell(db->fp);
     }
 
     return db;
@@ -86,7 +86,6 @@ slowdb *slowdb_open(const char *filename)
 void slowdb_close(slowdb *instance)
 {
     fclose(instance->fp);
-    free(instance->ents);
     for (size_t i = 0; i < instance->hashtab_buckets; i ++)
         free(instance->hashtab[i].items);
     free(instance->hashtab);

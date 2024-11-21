@@ -13,19 +13,22 @@ int32_t slowdb__hash(const unsigned char * data, int len)
 
 void slowdb__add_ent_idx(slowdb* db, size_t where, int32_t hash)
 {
-    db->ents = (size_t*)
-        realloc(db->ents, sizeof(size_t) * (db->ents_len + 1));
-    db->ents[db->ents_len] = where;
-
     slowdb_hashtab_bucket * bucket = &db->hashtab[((size_t ) hash) % db->hashtab_buckets];
 
     slowdb_hashtab_ent htent;
     htent.hash = hash;
-    htent.entid = db->ents_len;
+    htent.where = where;
     bucket->items = (slowdb_hashtab_ent *)
         realloc(bucket->items, sizeof(slowdb_hashtab_ent) * (bucket->count + 1));
     bucket->items[bucket->count ++] = htent;
-
-    db->ents_len ++;
 }
 
+void slowdb__rem_ent_idx(slowdb* db, slowdb__ent_id id)
+{
+    slowdb_hashtab_bucket *buck = &db->hashtab[id.bucket];
+    // we do not make list in bucket smaller because of perf reasons
+    memcpy(&buck->items[id.inbuck],
+          &buck->items[id.inbuck + 1],
+          sizeof(slowdb_hashtab_ent) * (buck->count - id.inbuck));
+    buck->count --;
+}

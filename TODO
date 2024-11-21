@@ -1,0 +1,27 @@
+indexing:
+- remove() should remove entry from hash table and entry list too
+- store compression algo in entry list 
+- only check key of entry if there are hash collissions
+- more buckets and 64 bit hashes
+- get rid of entry list and store all data in hash table
+- port flat hash map to C
+
+querying:
+- make iterator iterate over hash table instead
+
+compression:
+- fix LZ4 (de-)compression for big data (maybe the problem is about storing big data in general?)
+- add RLE-like compression for when many null bytes in data (example: struct tm)
+
+storage:
+- partially defragment database when entries deleted
+- after defrag, all locations where more than ... bytes are dead get deleted from the db (entries after that moved into them)
+- cache entries that are accessed a lot in memory
+
+concurrency:
+- use rwlock everywhere
+- duplicate fp for each concurrent read  (`fdopen(dup(fd), "rb+")`)
+
+security:
+- more error checking
+- improve header offset auto fix

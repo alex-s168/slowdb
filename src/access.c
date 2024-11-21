@@ -7,7 +7,8 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
     slowdb__compress comp;
     int found = 0;
     slowdb__iterPotentialEnt(instance, keyhs, entid, ({
-        fseek(instance->fp, instance->ents[entid], SEEK_SET);
+        slowdb_hashtab_ent* ent = slowdb__ent(instance, entid);
+        fseek(instance->fp, ent->where, SEEK_SET);
         slowdb_ent_header header;
         fread(&header, 1, sizeof(header), instance->fp);
         if (!(header.valid & 1) || header.key_len != keylen)
@@ -56,7 +57,8 @@ void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen,
 {
     int32_t keyhs = slowdb__hash(key, keylen);
     slowdb__iterPotentialEnt(instance, keyhs, entid, ({
-        fseek(instance->fp, instance->ents[entid], SEEK_SET);
+        slowdb_hashtab_ent* ent = slowdb__ent(instance, entid);
+        fseek(instance->fp, ent->where, SEEK_SET);
         slowdb_ent_header header;
         fread(&header, 1, sizeof(header), instance->fp);
         if (!(header.valid & 1) || header.key_len != keylen)
@@ -68,7 +70,7 @@ void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen,
             free(k);
             if (header.compress != COMPRESS_NONE) {
                 // because compression might make new data len != old data len, remove this entry and add new
-                slowdb__rm(instance, instance->ents[entid]);
+                slowdb__rm(instance, ent->where);
                 break;
             }
             else {
@@ -87,7 +89,8 @@ void slowdb_remove(slowdb *instance, const unsigned char *key, int keylen)
 {
     int32_t keyhs = slowdb__hash(key, keylen);
     slowdb__iterPotentialEnt(instance, keyhs, entid, ({
-        fseek(instance->fp, instance->ents[entid], SEEK_SET);
+        slowdb_hashtab_ent* ent = slowdb__ent(instance, entid);
+        fseek(instance->fp, ent->where, SEEK_SET);
         slowdb_ent_header header;
         fread(&header, 1, sizeof(header), instance->fp);
         if (!(header.valid & 1) || header.key_len != keylen)
@@ -96,7 +99,8 @@ void slowdb_remove(slowdb *instance, const unsigned char *key, int keylen)
         if (k == NULL) continue;
         fread(k, 1, header.key_len, instance->fp);
         if (!memcmp(key, k, header.key_len)) {
-            slowdb__rm(instance, instance->ents[entid]);
+            slowdb__rm(instance, ent->where);
+            slowdb__rem_ent_idx(instance, entid);
             free(k);
             break;
         }
@@ -104,26 +108,10 @@ void slowdb_remove(slowdb *instance, const unsigned char *key, int keylen)
     }));
 }
 
-static size_t slowdb__find_free_space(slowdb* instance, size_t keylen, size_t vallen)
+static size_t slowdb__get_free_space(slowdb* instance, size_t keylen, size_t vallen)
 {
-	size_t where;
-
-	if (instance->ents_len == 0) {
-		where = sizeof(slowdb_header);
-	} else {
-		size_t where_last = instance->ents[instance->ents_len - 1];
-
-		fseek(instance->fp, where_last, SEEK_SET);
-        slowdb_ent_header header;
-        fread(&header, 1, sizeof(header), instance->fp);
-
-        if (header.valid & 1) {
-        	where = where_last + sizeof(slowdb_ent_header) + header.key_len + header.data_len;
-		} else {
-			where = where_last;
-		}
-	}
-
+	size_t where = instance->next_new;
+    instance->next_new += keylen + vallen + sizeof(slowdb_ent_header);
     return where;
 }
 
@@ -133,7 +121,7 @@ void slowdb_put(slowdb *instance, const unsigned char *key, size_t keylen, const
     val = slowdb__comp(algo, val, vallen, &vallen);
     if (val == NULL) return;
 
-    size_t where = slowdb__find_free_space(instance, keylen, vallen);
+    size_t where = slowdb__get_free_space(instance, keylen, vallen);
 	fseek(instance->fp, where, SEEK_SET);
 
     slowdb_ent_header header;

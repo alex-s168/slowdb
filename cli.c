@@ -43,16 +43,16 @@ static int r_list(slowdb* db, int argc, char** argv)
         return 1;
     }
 
-    slowdb_iter i = slowdb_iter_new(db);
+    slowdb_iter* i = slowdb_iter_new(db);
 
-    while (slowdb_iter_next(&i))
+    while (slowdb_iter_next(i))
     {
         int keylen;
-        unsigned char * key = slowdb_iter_get_key(&i, &keylen);
+        unsigned char * key = slowdb_iter_get_key(i, &keylen);
         if (key == NULL) continue;
 
         int vallen;
-        unsigned char * val = slowdb_iter_get_val(&i, &vallen);
+        unsigned char * val = slowdb_iter_get_val(i, &vallen);
         if (val == NULL) continue;
 
         if (is_c_str(key, keylen))
@@ -66,6 +66,8 @@ static int r_list(slowdb* db, int argc, char** argv)
         free(key);
         free(val);
     }
+
+    slowdb_iter_delete(i);
 
     return 0;
 }

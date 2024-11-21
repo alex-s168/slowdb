@@ -1,13 +1,23 @@
 #include "internal.h"
 
-slowdb_iter slowdb_iter_new(slowdb* slowdb)
+slowdb_iter* slowdb_iter_new(slowdb* slowdb)
 {
-    return (slowdb_iter) { ._db = slowdb, ._ent_id = SIZE_MAX };
+    slowdb_iter* iter = malloc(sizeof(slowdb_iter));
+    iter->_db = slowdb;
+    iter->_ent_id.bucket = 0;
+    iter->_ent_id.inbuck = (half_size_t) SIZE_MAX;
+    return iter;
+}
+
+void slowdb_iter_delete(slowdb_iter* iter)
+{
+    free(iter);
 }
 
 static int slowdb__iter_seek_and_get_header(slowdb_iter* iter, slowdb_ent_header* header)
 {
-    fseek(iter->_db->fp, iter->_db->ents[iter->_ent_id], SEEK_SET);
+    slowdb_hashtab_ent* ent = slowdb__ent(iter->_db, iter->_ent_id);
+    fseek(iter->_db->fp, ent->where, SEEK_SET);
     fread(header, 1, sizeof(*header), iter->_db->fp);
     return (header->valid & 1);
 }
@@ -46,20 +56,26 @@ unsigned char * slowdb_iter_get_val(slowdb_iter* iter, int* lenout)
 // returns 1 if there was a next
 int slowdb_iter_next(slowdb_iter* iter)
 {
-    iter->_ent_id ++;
-    return iter->_ent_id < iter->_db->ents_len;
+    iter->_ent_id.inbuck ++;
+    while (iter->_ent_id.inbuck >= iter->_db->hashtab[iter->_ent_id.bucket].count) {
+        iter->_ent_id.inbuck = 0;
+        iter->_ent_id.bucket ++;
+        if (iter->_ent_id.bucket >= iter->_db->hashtab_buckets)
+            return 0;
+    }
+    return 1;
 }
 
 void slowdb_stats_get(slowdb* db, slowdb_stats* out)
 {
     memset(out, 0, sizeof(slowdb_stats));
 
-	slowdb_iter iter = slowdb_iter_new(db);
-	while (slowdb_iter_next(&iter))
+	slowdb_iter* iter = slowdb_iter_new(db);
+	while (slowdb_iter_next(iter))
 	{
 		slowdb_ent_header header;
 
-        if ( slowdb__iter_seek_and_get_header(&iter, &header) ) {
+        if ( slowdb__iter_seek_and_get_header(iter, &header) ) {
             out->num_alive_ents ++;
             out->bytes_alive_ents += header.key_len + header.data_len;
         }
@@ -78,4 +94,6 @@ void slowdb_stats_get(slowdb* db, slowdb_stats* out)
                 if (bucket.items[k].hash == bucket.items[j].hash)
                     out->num_hash_coll ++;
     }
+
+    slowdb_iter_delete(iter);
 }
