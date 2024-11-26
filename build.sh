@@ -1,5 +1,7 @@
 set -e
 
+DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 if [ -z $CC ]; then
     if hash clang 2>/dev/null; then 
         : "${CC:=clang}"
@@ -26,49 +28,53 @@ else
     : "${CFLAGS:=}"
 fi
 
+[ -d "$DIR/build" ] && rm -r "$DIR/build"
+mkdir "$DIR/build"
+
 has_include () {
-    echo "#include <$1>" > .check.c
-    if $CC .check.c -c -o .check.o 2>/dev/null; then
+    echo "#include <$1>" > "$DIR/build/.check.c"
+    if $CC "$DIR/build/.check.c" "$2" -c -o "$DIR/build/.check.o" 2>/dev/null; then
         echo 1
+        rm "$DIR/build/.check.o"
     else 
         echo 0
     fi
 }
 
 get_config () {
-    cat config.h | awk '{if(substr($0,1,1) == "#" && $2 == "'"$1"'"){ print $3 }}'
+    cat "$DIR/config.h" | awk '{if(substr($0,1,1) == "#" && $2 == "'"$1"'"){ print $3 }}'
 }
 
-if ! [ -f config.default.h ]; then
+if ! [ -f "$DIR/config.default.h" ]; then
     echo "# generating default config"
-    echo "// DO NOT EDIT (auto-generated)" > config.default.h
-    echo "#define _SLOWDB_WITH_LZ4 $(has_include lz4.h)" >> config.default.h 
-    echo "#define _SLOWDB_WITH_UNISHOX2 0" >> config.default.h 
+    echo "// DO NOT EDIT (auto-generated)" > "$DIR/config.default.h"
+    echo "#define _SLOWDB_WITH_LZ4 $(has_include lz4.h -llz4)" >> "$DIR/config.default.h" 
+    echo "#define _SLOWDB_WITH_UNISHOX2 0" >> "$DIR/config.default.h"
 fi
 
-if ! [ -f config.h ]; then
+if ! [ -f "$DIR/config.h" ]; then
     echo "# WARNING: you might want to set _SLOWDB_WITH_UNISHOX2 to 1 in the config.h, but remember that that changes the licence of the database from MIT to Apache 2.0"
-    cp config.default.h config.h
+    cp "$DIR/config.default.h" "$DIR/config.h"
 fi
 
-mkdir -p build
-
-$CC $CFLAGS -c -o build/access.o src/access.c
-$CC $CFLAGS -c -o build/iter.o src/iter.c
-$CC $CFLAGS -c -o build/main.o src/main.c
-$CC $CFLAGS -c -o build/utils.o src/utils.c
-$CC $CFLAGS -c -o build/compress.o src/compress.c \
-    -Wno-constant-conversion -Wno-pointer-sign -Wno-dangling-else
-
-if [ "$(get_config _SLOWDB_WITH_UNISHOX2)" = "1" ]; then
-    $CC -c -o build/unishox2.o src/unishox2/unishox2.c
-fi
-
-ar rcs build/slowdb.a build/*.o
-
-libs=""
+libs="$DIR/build/slowdb.a"
 if [ "$(get_config _SLOWDB_WITH_LZ4)" = "1" ]; then
     libs+=" -llz4"
 fi
 
-$CC $CFLAGS $libs cli.c build/slowdb.a -o slowdb.exe
+$CC $CFLAGS -c -o "$DIR/build/access.o" "$DIR/src/access.c" 1>/dev/null
+$CC $CFLAGS -c -o "$DIR/build/iter.o" "$DIR/src/iter.c" 1>/dev/null
+$CC $CFLAGS -c -o "$DIR/build/main.o" "$DIR/src/main.c" 1>/dev/null
+$CC $CFLAGS -c -o "$DIR/build/utils.o" "$DIR/src/utils.c" 1>/dev/null
+$CC $CFLAGS -c -o "$DIR/build/compress.o" "$DIR/src/compress.c" \
+    -Wno-constant-conversion -Wno-pointer-sign -Wno-dangling-else 1>/dev/null
+
+if [ "$(get_config _SLOWDB_WITH_UNISHOX2)" = "1" ]; then
+    $CC -c -o "$DIR/build/unishox2.o" "$DIR/src/unishox2/unishox2.c" 1>/dev/null
+fi
+
+ar rcs "$DIR/build/slowdb.a" "$DIR/build/"*.o 1>/dev/null
+
+$CC $CFLAGS $libs "$DIR/cli.c" -o "$DIR/slowdb.exe" 1>/dev/null
+
+echo "$libs"
