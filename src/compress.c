@@ -2,7 +2,10 @@
 
 slowdb__compress slowdb__select_compress(void const* data, size_t len)
 {
-    if (len == 0) return COMPRESS_NONE;
+	// TODO: breaks iterate
+	return COMPRESS_NONE;
+
+	if (len == 0) return COMPRESS_NONE;
 
     if (((const char *) data)[len-1] == '\0') {
         len --;
@@ -176,8 +179,8 @@ void * slowdb__decomp(slowdb__compress algo, void const* src, size_t len, size_t
                 dest = new;
             }
 
-            ((char*) dest)[was] = '\0';
-            *actual_len_out = was + 1;
+            ((char*) dest)[was-1] = '\0';
+            *actual_len_out = was;
             return dest;
         }
 

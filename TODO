@@ -1,11 +1,11 @@
 indexing:
 - only check key of entry if there are hash collissions
-- more buckets and 64 bit hashes
+- count num entries to find perfect amount of hashmap buckets
 - port flat hash map to C
 
 compression:
-- fix LZ4 (de-)compression for big data (maybe the problem is about storing big data in general?)
-- add RLE-like compression for when many null bytes in data (example: struct tm)
+- compress keys
+- (maybe already fixed) fix LZ4 (de-)compression for big data (maybe the problem is about storing big data in general?)
 
 storage:
 - partially defragment database when entries deleted

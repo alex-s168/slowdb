@@ -75,6 +75,6 @@ fi
 
 ar rcs "$DIR/build/slowdb.a" "$DIR/build/"*.o 1>/dev/null
 
-$CC $CFLAGS $libs "$DIR/cli.c" -o "$DIR/slowdb.exe" 1>/dev/null
+$CC $CFLAGS "$DIR/cli.c" $libs -o "$DIR/slowdb.exe" 1>/dev/null
 
 echo "$libs"

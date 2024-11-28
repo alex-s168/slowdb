@@ -17,7 +17,7 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
         if (k == NULL) continue;
         fread(k, 1, header.key_len, instance->fp);
         if (!memcmp(key, k, header.key_len)) {
-            found = header.data_len;
+            found = header.data_len + 1;
             comp = header.compress;
             free(k);
             break;
@@ -26,6 +26,7 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
     }));
 
     if (!found) return NULL;
+	found --;
 
     unsigned char * res = (unsigned char*) malloc(found);
     if (res == NULL) return NULL;
@@ -50,6 +51,8 @@ static void slowdb__rm(slowdb *instance, size_t where)
     fseek(instance->fp, where, SEEK_SET);
     header.valid = (char) SLOWDB__ENT_MAGIC;
     fwrite(&header, 1, sizeof(header), instance->fp);
+	if (where + sizeof(header) + header.key_len + header.data_len == instance->next_new)
+		instance->next_new = where;
 }
 
 // TODO: get rid of that in the future because of compression
@@ -71,6 +74,7 @@ void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen,
             if (header.compress != COMPRESS_NONE) {
                 // because compression might make new data len != old data len, remove this entry and add new
                 slowdb__rm(instance, ent->where);
+				slowdb__rem_ent_idx(instance, entid);
                 break;
             }
             else {
@@ -117,6 +121,16 @@ static size_t slowdb__get_free_space(slowdb* instance, size_t keylen, size_t val
 
 void slowdb_put(slowdb *instance, const unsigned char *key, size_t keylen, const unsigned char *val, size_t vallen)
 {
+	if ((size_t) (uint16_t) keylen != keylen) {
+		fprintf(stderr, "key len does not fit in u16\n");
+		exit(1);
+	}
+
+	if ((size_t) (uint16_t) vallen != vallen) {
+		fprintf(stderr, "val len does not fit in u16\n");
+		exit(1);
+	}
+
     slowdb__compress algo = slowdb__select_compress(val, vallen);
     val = slowdb__comp(algo, val, vallen, &vallen);
     if (val == NULL) return;

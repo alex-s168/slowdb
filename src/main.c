@@ -11,33 +11,34 @@ slowdb *slowdb_open(const char *filename)
         free(db);
         return NULL;
     }
-    rewind(db->fp);
+    fseek(db->fp, 0, SEEK_SET);
 
     db->hashtab_buckets = 32;
     db->hashtab = (slowdb_hashtab_bucket *)
         malloc(db->hashtab_buckets * sizeof(slowdb_hashtab_bucket));
     if (db->hashtab == NULL) {
-        free(db);
         fclose(db->fp);
+        free(db);
         return NULL;
     }
     memset(db->hashtab, 0, db->hashtab_buckets * sizeof(slowdb_hashtab_bucket));
 
     slowdb_header header;
     db->next_new = sizeof(header);
-	fread(&header, 1, sizeof(header), db->fp);
-    if ( feof(db->fp) ) {
-        fseek(db->fp, 0, SEEK_SET);
+	if ( fread(&header, 1, sizeof(header), db->fp) != sizeof(header) ) {
+		fseek(db->fp, 0, SEEK_SET);
         memcpy(header.magic, slowdb__header_magic, sizeof(slowdb__header_magic));
         fwrite(&header, 1, sizeof(header), db->fp);
-    }
-    else {
+    } else {
         if ( memcmp(header.magic, slowdb__header_magic, sizeof(slowdb__header_magic)) ){
             fclose(db->fp);
             free(db);
 			fprintf(stderr, "db file magic seq does not match\n");
             return NULL;
         }
+
+		// TODO: WHY REQUIRED
+		fseek(db->fp, sizeof(header), SEEK_SET);
 
         while (1)
         {
@@ -58,6 +59,21 @@ slowdb *slowdb_open(const char *filename)
 						break;
 					}
 				}
+				if (!recovered && where > sizeof(eh)) {
+					fseek(db->fp, where - sizeof(eh), SEEK_SET);
+					fread(&eh, 1, sizeof(eh), db->fp);
+					for (size_t i = 0; i < sizeof(eh); i++) {
+						if ((((char *) (void*) &eh)[i] & 0b11111110) == SLOWDB__ENT_MAGIC) {
+							size_t off = sizeof(eh) - i;
+							fprintf(stderr, "recovered with off of -%zu bytes\n", off);
+							where -= off;
+							fseek(db->fp, where, SEEK_SET);
+							fread(&eh, 1, sizeof(eh), db->fp);
+							recovered = 1;
+							break;
+						}
+					}
+				}
 				if (!recovered) {
 					fprintf(stderr, "could not recover\n");
 					return NULL;
@@ -72,12 +88,11 @@ slowdb *slowdb_open(const char *filename)
                     free(k);
                     slowdb__add_ent_idx(db, where, hash);
                 }
+				db->next_new = where + sizeof(slowdb_ent_header) + eh.data_len + eh.key_len;
             }
 
             fseek(db->fp, where + sizeof(slowdb_ent_header) + eh.data_len + eh.key_len, SEEK_SET);
         }
-
-        db->next_new = ftell(db->fp);
     }
 
     return db;
