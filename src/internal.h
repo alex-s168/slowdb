@@ -15,7 +15,7 @@
 # include <io.h>
 #endif
 
-typedef enum : char {
+typedef enum {
     COMPRESS_NONE = 0,
     COMPRESS_STRPACK = 1,
 #if _SLOWDB_WITH_UNISHOX2
@@ -74,7 +74,7 @@ typedef struct {
     /** SLOWDB__ENT_MAGIC | valid */
     char valid;
     /** only for data, not key */
-    slowdb__compress compress;
+    char compress; // compress to slowdb__compress
 
     uint16_t key_len;
 
@@ -103,7 +103,7 @@ void * slowdb__decomp(slowdb__compress algo, void const* src, size_t len, size_t
 #define freea(var, size)    { if ((size) > 1024) free((var)); }
 
 // 0 = no next 
-#define slowdb__iterPotentialEnt(db, hashh, idVar, fn) \
+#define slowdb__iterPotentialEnt(db, hashh, idVar) \
 { \
     size_t buckn = ((size_t) hashh) % (db)->hashtab_buckets; \
     slowdb_hashtab_bucket bucket = \
@@ -111,13 +111,8 @@ void * slowdb__decomp(slowdb__compress algo, void const* src, size_t len, size_t
 \
     for (size_t __buck = 0; __buck < bucket.count; __buck ++) \
     { \
-        if (bucket.items[__buck].hash == (hashh)) \
-        { \
-            slowdb__ent_id idVar = (slowdb__ent_id) { .bucket = (half_size_t) buckn, .inbuck = (half_size_t) __buck } ; \
-            fn; \
-        } \
-    } \
-}
+        if (bucket.items[__buck].hash != (hashh)) continue; \
+        slowdb__ent_id idVar = (slowdb__ent_id) { .bucket = (half_size_t) buckn, .inbuck = (half_size_t) __buck } ; \
 
 struct slowdb_iter {
     /** INTERNAL! */

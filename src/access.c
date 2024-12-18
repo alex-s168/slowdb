@@ -6,7 +6,7 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
 
     slowdb__compress comp;
     int found = 0;
-    slowdb__iterPotentialEnt(instance, keyhs, entid, ({
+    slowdb__iterPotentialEnt(instance, keyhs, entid)
         slowdb_hashtab_ent* ent = slowdb__ent(instance, entid);
         fseek(instance->fp, ent->where, SEEK_SET);
         slowdb_ent_header header;
@@ -23,7 +23,7 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
             break;
         }
         free(k);
-    }));
+    }}
 
     if (!found) return NULL;
 	found --;
@@ -59,7 +59,7 @@ static void slowdb__rm(slowdb *instance, size_t where)
 void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen, const unsigned char *val, int vallen)
 {
     int32_t keyhs = slowdb__hash(key, keylen);
-    slowdb__iterPotentialEnt(instance, keyhs, entid, ({
+    slowdb__iterPotentialEnt(instance, keyhs, entid)
         slowdb_hashtab_ent* ent = slowdb__ent(instance, entid);
         fseek(instance->fp, ent->where, SEEK_SET);
         slowdb_ent_header header;
@@ -84,7 +84,7 @@ void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen,
             }
         }
         free(k);
-    }));
+    }}
 
     (void) slowdb_put(instance, key, keylen, val, vallen);
 }
@@ -92,7 +92,7 @@ void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen,
 void slowdb_remove(slowdb *instance, const unsigned char *key, int keylen)
 {
     int32_t keyhs = slowdb__hash(key, keylen);
-    slowdb__iterPotentialEnt(instance, keyhs, entid, ({
+    slowdb__iterPotentialEnt(instance, keyhs, entid)
         slowdb_hashtab_ent* ent = slowdb__ent(instance, entid);
         fseek(instance->fp, ent->where, SEEK_SET);
         slowdb_ent_header header;
@@ -109,7 +109,7 @@ void slowdb_remove(slowdb *instance, const unsigned char *key, int keylen)
             break;
         }
         free(k);
-    }));
+    }}
 }
 
 static size_t slowdb__get_free_space(slowdb* instance, size_t keylen, size_t vallen)

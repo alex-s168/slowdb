@@ -20,6 +20,7 @@ if [ -z $CC ]; then
     elif hash tcc 2>/dev/null; then
         : "${CC:=tcc}"
         : "${CFLAGS:=-g}"
+        : "${AR:="tcc -ar"}"
     else 
         echo no c compiler found 
         echo manually set CC!
@@ -27,6 +28,8 @@ if [ -z $CC ]; then
 else 
     : "${CFLAGS:=}"
 fi
+
+: "${AR:=ar}"
 
 [ -d "$DIR/build" ] && rm -r "$DIR/build"
 mkdir "$DIR/build"
@@ -73,7 +76,7 @@ if [ "$(get_config _SLOWDB_WITH_UNISHOX2)" = "1" ]; then
     $CC -c -o "$DIR/build/unishox2.o" "$DIR/src/unishox2/unishox2.c" 1>/dev/null
 fi
 
-ar rcs "$DIR/build/slowdb.a" "$DIR/build/"*.o 1>/dev/null
+$AR rcs "$DIR/build/slowdb.a" "$DIR/build/"*.o 1>/dev/null
 
 $CC $CFLAGS "$DIR/cli.c" $libs -o "$DIR/slowdb.exe" 1>/dev/null
 
