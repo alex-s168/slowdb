@@ -1,5 +1,21 @@
 set -e
 
+if ! [ -z $1 ]; then
+    if [ $1 = "clean" ]; then
+        >&2 echo \# resetting config
+        rm config.default.h
+        rm config.h
+    else
+        >&2 echo invalid usage! expected either \"clean\" as argument, or no arguments at all
+        exit 1
+    fi
+fi
+
+if ! hash awk 2>/dev/null; then
+    >&2 echo awk required
+    exit 1
+fi
+
 DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 if [ -z $CC ]; then
@@ -22,8 +38,9 @@ if [ -z $CC ]; then
         : "${CFLAGS:=-g}"
         : "${AR:="tcc -ar"}"
     else 
-        echo no c compiler found 
-        echo manually set CC!
+        >&2 echo no c compiler found 
+        >&2 echo manually set CC!
+        exit 1
     fi
 else 
     : "${CFLAGS:=}"
@@ -49,14 +66,14 @@ get_config () {
 }
 
 if ! [ -f "$DIR/config.default.h" ]; then
-    echo "# generating default config"
+    >&2 echo "# generating default config"
     echo "// DO NOT EDIT (auto-generated)" > "$DIR/config.default.h"
     echo "#define _SLOWDB_WITH_LZ4 $(has_include lz4.h -llz4)" >> "$DIR/config.default.h" 
     echo "#define _SLOWDB_WITH_UNISHOX2 0" >> "$DIR/config.default.h"
 fi
 
 if ! [ -f "$DIR/config.h" ]; then
-    echo "# WARNING: you might want to set _SLOWDB_WITH_UNISHOX2 to 1 in the config.h, but remember that that changes the licence of the database from MIT to Apache 2.0"
+    >&2 echo "# WARNING: you might want to set _SLOWDB_WITH_UNISHOX2 to 1 in the config.h, but remember that that changes the licence of the database from MIT to Apache 2.0"
     cp "$DIR/config.default.h" "$DIR/config.h"
 fi
 
