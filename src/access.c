@@ -1,4 +1,5 @@
 #include "internal.h"
+#include <stdatomic.h>
 
 unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen, int *vallen)
 {
@@ -79,6 +80,7 @@ void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen,
             }
             else {
                 assert(header.data_len == vallen && "cannot slowdb_replaceOrPut() with different vallen than before");
+                fseek(instance->fp, ent->where + sizeof(header) + header.key_len, SEEK_SET);
                 fwrite(val, 1, vallen, instance->fp);
                 return;
             }
@@ -145,7 +147,9 @@ void slowdb_put(slowdb *instance, const unsigned char *key, size_t keylen, const
     header.compress = algo;
 
     fwrite(&header, 1, sizeof(header), instance->fp);
+    fseek(instance->fp, where + sizeof(header), SEEK_SET);
     fwrite(key, 1, header.key_len, instance->fp);
+    fseek(instance->fp, where + sizeof(header) + header.key_len, SEEK_SET);
     fwrite(val, 1, header.data_len, instance->fp);
 
     int32_t hash = slowdb__hash(key, header.key_len);
