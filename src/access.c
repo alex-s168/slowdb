@@ -1,5 +1,4 @@
 #include "internal.h"
-#include <stdatomic.h>
 
 unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen, int *vallen)
 {
