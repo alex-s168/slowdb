@@ -68,7 +68,10 @@ slowdb__compress slowdb__select_compress(void const* data, size_t len)
 
 void * slowdb__comp(slowdb__compress algo, void const* src, size_t len, size_t *actual_len_out)
 {
-    if (len == 0) return NULL;
+    if (len == 0) {
+        *actual_len_out = 0;
+        return NULL;
+    }
 
     if (algo == COMPRESS_STRPACK 
 #if _SLOWDB_WITH_UNISHOX2

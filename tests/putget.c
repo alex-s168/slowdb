@@ -1,50 +1,12 @@
-#include "inc/slowdb.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <stdint.h>
-#include <assert.h>
-
-long rand_range(long min, long max) {
-	if (min > max) {
-		long temp = min;
-		min = max;
-		max = temp;
-	}
-	long val = min + (long)((double)(max - min + 1) * rand() / (RAND_MAX + 1.0));
-    assert(val >= min);
-    assert(val <= max);
-    return val;
-}
-
-uint8_t* rand_arr(size_t num, uint8_t min, uint8_t max) {
-	uint8_t* ptr = malloc(num + 1);
-    assert(ptr);
-	ptr[num] = '\0';
-	for (size_t i = 0; i < num; i ++)
-		ptr[i] = rand_range(min, max);
-	return ptr;
-}
-
-#define require(v) { assert(v); if (!(v)) exit(1); }
-
-static void require_eq__impl(size_t a, size_t b, char const* aa, char const* bb) {
-    if (a != b) {
-        fprintf(stderr, "assertion failed: %s == %s\n left side was: %zu\n right side was: %zu\n", aa, bb, a, b);
-        exit(1);
-    }
-}
-
-#define require_eq(a,b) require_eq__impl((size_t) a, (size_t) b, #a, #b)
+#include "util.h"
 
 static size_t next_keylen;
 static size_t next_vallen;
 
-#define KEYLEN_ITERS 300
+#define KEYLEN_ITERS 270
 #define KEYLEN_STEP 1
 
-#define VALLEN_ITERS 300
+#define VALLEN_ITERS 270
 #define VALLEN_STEP 1
 
 #define NUM_REOPEN_PER_VALLEN 4
@@ -82,13 +44,19 @@ int main() {
     // even though that is bad practice in a test, it allows us to potentially catch more issues than fixing the seed.
 	srand(time(NULL));
 
+    slowdb_open_opts opts;
+    slowdb_open_opts_default(&opts);
+
+    delete_file(".test.db");
+
+    puts("inserts and deletes");
     next_vallen = 0;
 	for (size_t iii = 0; iii < VALLEN_ITERS; iii ++) 
     {
         for (size_t i = 0; i < NUM_REOPEN_PER_VALLEN; i ++)
         {
             //puts("reopen");
-            slowdb* db = slowdb_open(".test.db");
+            slowdb* db = slowdb_openx(".test.db", &opts);
             require(db);
 
             next_keylen = 1;

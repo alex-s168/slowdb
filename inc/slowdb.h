@@ -17,7 +17,7 @@ int slowdb_put(slowdb *instance, const unsigned char *key, size_t keylen, const 
  * *vallen contains the size of the returned value in bytes and can be NULL if you are not interested in it.
  *
  * note that the result will be NULL either when an error occured, or when the val len is 0!
- * if the val len is 0, and the entry is not found, it won't overwrite the [vallen] arg
+ * if the val len is 0, or the entry is not found, it won't overwrite the [vallen] arg
  */ 
 unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen, int *vallen);
 
