@@ -32,6 +32,7 @@ slowdb *slowdb_open(const char *filename)
     } else {
         if ( memcmp(header.magic, slowdb__header_magic, sizeof(slowdb__header_magic)) ){
             fclose(db->fp);
+            free(db->hashtab);
             free(db);
 			fprintf(stderr, "db file magic seq does not match\n");
             return NULL;
@@ -76,6 +77,7 @@ slowdb *slowdb_open(const char *filename)
 				}
 				if (!recovered) {
 					fprintf(stderr, "could not recover\n");
+                    slowdb_close(db);
 					return NULL;
 				}
 			}

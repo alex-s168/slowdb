@@ -43,6 +43,8 @@ get_config () {
     cat "$DIR/config.h" | awk '{if(substr($0,1,1) == "#" && $2 == "'"$1"'"){ print $3 }}'
 }
 
+OLD_CFLAGS="$CFLAGS"
+
 if [ -z $CC ]; then if hash cc 2>/dev/null; then 
         CC=cc
 
@@ -98,7 +100,10 @@ fi
 : "${CFLAGS:=}"
 : "${AR:=ar}"
 
->&2 echo "CC=\"$CC\" AR=\"$AR\" CFLAGS=\"$CFLAGS\""
+CFLAGS+=" "
+CFLAGS+=$OLD_CFLAGS
+
+>&2 echo "slowdb: CC=\"$CC\" AR=\"$AR\" CFLAGS=\"$CFLAGS\""
 
 if ! [ -f "$DIR/config.default.h" ]; then
     >&2 echo "# generating default config"

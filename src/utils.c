@@ -2,7 +2,7 @@
 
 char slowdb__header_magic[8] = {':', 's', 'l', 'o', 'w', 'd', 'b', '1'};
 
-void slowdb__add_ent_idx(slowdb* db, size_t where, int32_t hash)
+void slowdb__add_ent_idx(slowdb* db, size_t where, slowdb__hash_t hash)
 {
     slowdb_hashtab_bucket * bucket = &db->hashtab[((size_t ) hash) % db->hashtab_buckets];
 
@@ -26,7 +26,7 @@ void slowdb__rem_ent_idx(slowdb* db, slowdb__ent_id id)
 
 #define FNV1A(type, prime, offset, dest, value, valueSize) { \
     type hash = offset;                                      \
-    for (size_t i = 0; i < valueSize; i ++) {                \
+    for (size_t i = 0; i < ((size_t)valueSize); i ++) {      \
         uint8_t byte = ((uint8_t *)value)[i];                \
         hash ^= byte;                                        \
         hash *= prime;                                       \

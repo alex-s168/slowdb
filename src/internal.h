@@ -64,7 +64,7 @@ struct slowdb {
     size_t next_new;
 };
 
-static slowdb_hashtab_ent* slowdb__ent(slowdb* db, slowdb__ent_id id) {
+static inline slowdb_hashtab_ent* slowdb__ent(slowdb* db, slowdb__ent_id id) {
     return &db->hashtab[id.bucket].items[id.inbuck];
 }
 
@@ -89,11 +89,11 @@ typedef struct {
 } __attribute__((packed)) slowdb_header;
 
 slowdb__hash_t slowdb__hash(const unsigned char * data, int len);
-void slowdb__add_ent_idx(slowdb* db, size_t where, int32_t hash);
+void slowdb__add_ent_idx(slowdb* db, size_t where, slowdb__hash_t hash);
 void slowdb__rem_ent_idx(slowdb* db, slowdb__ent_id id);
 
 /** returns 1 if valid */
-static int slowdb__iter_seek_and_get_header(slowdb_iter* iter, slowdb_ent_header* header);
+int slowdb__iter_seek_and_get_header(slowdb_iter* iter, slowdb_ent_header* header);
 
 slowdb__compress slowdb__select_compress(void const* data, size_t len);
 void * slowdb__comp(slowdb__compress algo, void const* src, size_t len, size_t *actual_len_out);

@@ -3,6 +3,7 @@
 slowdb_iter* slowdb_iter_new(slowdb* slowdb)
 {
     slowdb_iter* iter = malloc(sizeof(slowdb_iter));
+    if (!iter) return NULL;
     iter->_db = slowdb;
     iter->_ent_id.bucket = 0;
     iter->_ent_id.inbuck = (half_size_t) SIZE_MAX;
@@ -14,7 +15,7 @@ void slowdb_iter_delete(slowdb_iter* iter)
     free(iter);
 }
 
-static int slowdb__iter_seek_and_get_header(slowdb_iter* iter, slowdb_ent_header* header)
+int slowdb__iter_seek_and_get_header(slowdb_iter* iter, slowdb_ent_header* header)
 {
     slowdb_hashtab_ent* ent = slowdb__ent(iter->_db, iter->_ent_id);
     fseek(iter->_db->fp, ent->where, SEEK_SET);
@@ -71,6 +72,8 @@ void slowdb_stats_get(slowdb* db, slowdb_stats* out)
     memset(out, 0, sizeof(slowdb_stats));
 
 	slowdb_iter* iter = slowdb_iter_new(db);
+    if (!iter) return;
+
 	while (slowdb_iter_next(iter))
 	{
 		slowdb_ent_header header;

@@ -7,24 +7,35 @@ typedef struct slowdb slowdb;
 
 // TODO: use size_t everywhere
 
-/** add a new record to the database. does NOT overwrite old records */
-void slowdb_put(slowdb *instance, const unsigned char *key, size_t keylen, const unsigned char *val, size_t vallen);
+/**
+ * add a new record to the database. does NOT overwrite old records 
+ *
+ * returns 0 on success
+ */
+int slowdb_put(slowdb *instance, const unsigned char *key, size_t keylen, const unsigned char *val, size_t vallen);
 
 /**
  * Get a HEAP ALLOCATED pointer to an existing record. 
  * *vallen contains the size of the returned value in bytes and can be NULL if you are not interested in it.
+ *
+ * note that the result will be NULL either when an error occured, or when the val len is 0!
+ * if the val len is 0, and the entry is not found, it won't overwrite the [vallen] arg
  */ 
 unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen, int *vallen);
 
 /**
  * try to remove an entry from the database 
+ *
+ * returns 0 if entry found
  */
-void slowdb_remove(slowdb *instance, const unsigned char *key, int keylen);
+int slowdb_remove(slowdb *instance, const unsigned char *key, int keylen);
 
 /**
  * replace (or if it does not exist, put) the value of an entry in the database with new data of SAME LENGTH 
+ *
+ * returns 0 on success.
  */
-void slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen, const unsigned char *val, int vallen);
+int slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen, const unsigned char *val, int vallen);
 
 /** Open existing or create new database */
 slowdb *slowdb_open(const char *filename);
