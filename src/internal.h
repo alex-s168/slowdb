@@ -62,6 +62,9 @@ struct slowdb {
     slowdb_hashtab_bucket * hashtab;
 
     size_t next_new;
+
+    slowdb_logfn logfn;
+    void* logfn_userdata;
 };
 
 static inline slowdb_hashtab_ent* slowdb__ent(slowdb* db, slowdb__ent_id id) {
@@ -98,6 +101,8 @@ int slowdb__iter_seek_and_get_header(slowdb_iter* iter, slowdb_ent_header* heade
 slowdb__compress slowdb__select_compress(void const* data, size_t len);
 void * slowdb__comp(slowdb__compress algo, void const* src, size_t len, size_t *actual_len_out);
 void * slowdb__decomp(slowdb__compress algo, void const* src, size_t len, size_t *actual_len_out);
+
+void slowdb__logf(slowdb* instance, slowdb_log_level lvl, char const* fmt, ...);
 
 #define malloca(dest, size) { if ((size) > 1024) dest = malloc((size)); else { char buf[size]; dest = (void*) (&buf); }  }
 #define freea(var, size)    { if ((size) > 1024) free((var)); }

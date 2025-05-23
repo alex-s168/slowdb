@@ -51,17 +51,29 @@ static void slowdb__rm(slowdb *instance, size_t where)
 {
     fseek(instance->fp, where, SEEK_SET);
     slowdb_ent_header header;
-    fread(&header, 1, sizeof(header), instance->fp);
+    assert( fread(&header, 1, sizeof(header), instance->fp) == sizeof(header) );
     if (!(header.valid & 1))
         return;
-    fseek(instance->fp, where, SEEK_SET);
     header.valid = (char) SLOWDB__ENT_MAGIC;
-    fwrite(&header, 1, sizeof(header), instance->fp);
-	if (where + sizeof(header) + header.key_len + header.data_len == instance->next_new)
+    fseek(instance->fp, where, SEEK_SET);
+    assert( fwrite(&header, 1, sizeof(header), instance->fp) == sizeof(header) );
+
+    size_t next_ent_off = where + sizeof(header) + header.key_len + header.data_len;
+	if (next_ent_off == instance->next_new)
 		instance->next_new = where;
+
+    fseek(instance->fp, next_ent_off, SEEK_SET);
+    fread(&header, 1, sizeof(header), instance->fp);
+
+    if (!(header.valid & 1)) {
+        size_t next_next_ent_off = next_ent_off + sizeof(header) + header.key_len + header.data_len;
+
+        if (next_next_ent_off == instance->next_new)
+            instance->next_new = where;
+    }
 }
 
-// TODO: get rid of that in the future because of compression
+// TODO: look into that in future because of compression
 int slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen, const unsigned char *val, int vallen)
 {
     slowdb__hash_t keyhs = slowdb__hash(key, keylen);

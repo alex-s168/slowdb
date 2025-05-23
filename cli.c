@@ -14,7 +14,7 @@ static bool is_c_str(unsigned char * data, int len)
     return true;
 }
 
-static int r_info(slowdb* db, int argc, char** argv)
+static int r_info(slowdb** db_out, char const* path, slowdb_open_opts const* opts, int argc, char** argv)
 {
     (void) argv;
 
@@ -24,11 +24,14 @@ static int r_info(slowdb* db, int argc, char** argv)
     }
 
     slowdb_stats stats;
-    slowdb_stats_get(db, &stats);
+    *db_out = slowdb_stats_get(path, opts, &stats);
+    if (!*db_out)
+        return 1;
 
     printf("alive entries:    %zu (%zu B)\n", stats.num_alive_ents, stats.bytes_alive_ents);
     printf("dead entries:     %zu (%zu B)\n", stats.num_dead_ents, stats.bytes_dead_ents);
     printf("hash collissions: %zu\n", stats.num_hash_coll);
+    printf("hash entries:     %zu\n", stats.num_lookup_entries);
 
     return 0;
 }
@@ -161,7 +164,7 @@ int main(int argc, char** argv)
     freopen(NULL, "wb", stdout);
 
     if (argc < 3) {
-        fprintf(stderr, "usage: slowdb [operation] [file] args...\n");
+        fprintf(stderr, "usage: slowdb [--try-recover] <operation> <file> args...\n");
         fprintf(stderr, "operations:\n");
         fprintf(stderr, "   create             if the db does not exists, creates it\n");
         fprintf(stderr, "   info               view information about the database\n");
@@ -173,9 +176,25 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    int try_recover = 0;
+    while (1) {
+        if (!strcmp(argv[1], "--try-recover")) {
+            try_recover = 1;
+        }
+        else {
+            break;
+        }
+
+        argv ++;
+    }
+
     const char * op = argv[1];
 
-    slowdb* db = slowdb_open(argv[2]);
+    slowdb_open_opts opts;
+    slowdb_open_opts_default(&opts);
+    opts.try_recover_header_offsets = try_recover;
+
+    slowdb* db = slowdb_openx(argv[2], &opts);
     if (db == NULL) {
         fprintf(stderr, "could not open database!\n");
         return 1;
@@ -185,8 +204,10 @@ int main(int argc, char** argv)
 
     if (!strcmp(op, "list"))
         status = r_list(db, argc - 3, argv + 3);
-    else if (!strcmp(op, "info"))
-        status = r_info(db, argc - 3, argv + 3);
+    else if (!strcmp(op, "info")) {
+        slowdb_close(db);
+        status = r_info(&db, argv[2], &opts, argc - 3, argv + 3);
+    }
     else if (!strcmp(op, "get"))
         status = r_get(db, argc - 3, argv + 3);
     else if (!strcmp(op, "rm"))

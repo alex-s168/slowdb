@@ -7,7 +7,15 @@
 #include <assert.h>
 
 long rand_range(long min, long max) {
-	return rand() % (max + 1 - min) + min; 
+	if (min > max) {
+		long temp = min;
+		min = max;
+		max = temp;
+	}
+	long val = min + (long)((double)(max - min + 1) * rand() / (RAND_MAX + 1.0));
+    assert(val >= min);
+    assert(val <= max);
+    return val;
 }
 
 uint8_t* rand_arr(size_t num, uint8_t min, uint8_t max) {
@@ -30,10 +38,22 @@ static void require_eq__impl(size_t a, size_t b, char const* aa, char const* bb)
 
 #define require_eq(a,b) require_eq__impl((size_t) a, (size_t) b, #a, #b)
 
+static size_t next_keylen;
+static size_t next_vallen;
+
+#define KEYLEN_ITERS 300
+#define KEYLEN_STEP 1
+
+#define VALLEN_ITERS 300
+#define VALLEN_STEP 1
+
+#define NUM_REOPEN_PER_VALLEN 4
+
 void rand_putrem_test(slowdb* db, uint8_t key_min, uint8_t key_max, uint8_t val_min, uint8_t val_max) {
     assert(db);
-	size_t keylen = rand_range(10, 200);
-	size_t vallen = rand_range(0, 800);
+	size_t keylen = next_keylen;
+	size_t vallen = next_vallen;
+
 	uint8_t* key = rand_arr(keylen, key_min, key_max);
 	uint8_t* val = rand_arr(vallen, val_min, val_max);
 
@@ -47,39 +67,53 @@ void rand_putrem_test(slowdb* db, uint8_t key_min, uint8_t key_max, uint8_t val_
 	require(!memcmp(val2, val, vallen));
 
 	require(!slowdb_remove(db, key, keylen));
-
 	require(slowdb_get(db, key, keylen, NULL) == NULL);
 
 	free(key);
 	free(val);
+
+    next_keylen += KEYLEN_STEP;
 }
 
 #define R_ASCII 1, 127
 #define R_BIN   0, 255
 
 int main() {
+    // even though that is bad practice in a test, it allows us to potentially catch more issues than fixing the seed.
 	srand(time(NULL));
 
-	for (size_t iii = 0; iii < 4; iii ++) {
-		slowdb* db = slowdb_open(".test.db");
-        require(db);
+    next_vallen = 0;
+	for (size_t iii = 0; iii < VALLEN_ITERS; iii ++) 
+    {
+        for (size_t i = 0; i < NUM_REOPEN_PER_VALLEN; i ++)
+        {
+            //puts("reopen");
+            slowdb* db = slowdb_open(".test.db");
+            require(db);
 
-		puts("ascii - ascii");
-		for (size_t i = 0; i < 100; i ++)
-			rand_putrem_test(db, R_ASCII, R_ASCII);
+            next_keylen = 1;
+            //puts(" ascii  - ascii");
+            for (size_t i = 0; i < KEYLEN_ITERS; i ++)
+                rand_putrem_test(db, R_ASCII, R_ASCII);
 
-		puts("ascii - binary");
-		for (size_t i = 0; i < 100; i ++)
-			rand_putrem_test(db, R_ASCII, R_BIN);
+            next_keylen = 1;
+            //puts(" ascii  - binary");
+            for (size_t i = 0; i < KEYLEN_ITERS; i ++)
+                rand_putrem_test(db, R_ASCII, R_BIN);
 
-		puts("binary - ascii");
-		for (size_t i = 0; i < 100; i ++)
-			rand_putrem_test(db, R_BIN, R_ASCII);
+            next_keylen = 1;
+            //puts(" binary - ascii");
+            for (size_t i = 0; i < KEYLEN_ITERS; i ++)
+                rand_putrem_test(db, R_BIN, R_ASCII);
 
-		puts("binary - binary");
-		for (size_t i = 0; i < 100; i ++)
-			rand_putrem_test(db, R_BIN, R_BIN);
+            next_keylen = 1;
+            //puts(" binary - binary");
+            for (size_t i = 0; i < KEYLEN_ITERS; i ++)
+                rand_putrem_test(db, R_BIN, R_BIN);
 
-		slowdb_close(db);
+            slowdb_close(db);
+        }
+
+        next_vallen += VALLEN_STEP;
 	}
 }
