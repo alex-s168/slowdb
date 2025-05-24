@@ -1,11 +1,11 @@
 indexing:
 - only check key of entry if there are hash collissions
-- count num entries to find perfect amount of hashmap buckets
+- automatically re-balance hash map
 - port flat hash map to C
+- secondary indexes
 
 compression:
-- compress keys
-- (maybe already fixed) fix LZ4 (de-)compression for big data (maybe the problem is about storing big data in general?)
+- compress keys: store hash in key field of entry, and use beginning of data field to store actual key
 
 storage:
 - partially defragment database when entries deleted
@@ -17,6 +17,5 @@ concurrency:
 - use rwlock everywhere
 - duplicate fp for each concurrent read  (`fdopen(dup(fd), "rb+")`)
 
-security:
-- more error checking
-- improve header offset auto fix
+testing:
+- similar to put / get, but store more entries at a time
