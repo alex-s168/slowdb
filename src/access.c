@@ -149,7 +149,7 @@ int slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen, 
         safe_fread(k, header.key_len, instance->fp);
         if (!memcmp(key, k, header.key_len)) {
             free(k);
-            if (header.compress == COMPRESS_NONE && header.data_len != vallen) {
+            if (header.compress == COMPRESS_NONE && header.data_len == vallen) {
                 safe_fseek_set(instance->fp, ent->where + sizeof(header) + header.key_len);
                 safe_fwrite(val, vallen, instance->fp);
                 safe_flush(instance->fp);

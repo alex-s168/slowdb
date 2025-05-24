@@ -2,9 +2,6 @@
 
 slowdb__compress slowdb__select_compress(void const* data, size_t len)
 {
-	// TODO: breaks iterate
-	return COMPRESS_NONE;
-
 	if (len == 0) return COMPRESS_NONE;
 
     if (((const char *) data)[len-1] == '\0') {
@@ -36,10 +33,12 @@ slowdb__compress slowdb__select_compress(void const* data, size_t len)
         }
     }
 
+#if _SLOWDB_WITH_STRPACK
     if (!any_wide && !any_null)
         return COMPRESS_STRPACK;
+#endif
 #if _SLOWDB_WITH_UNISHOX2
-    else if (!any_null)
+    if (!any_null)
         return COMPRESS_UNISHOX2;
 #endif
 
@@ -50,13 +49,15 @@ slowdb__compress slowdb__select_compress(void const* data, size_t len)
 #endif
 }
 
-#include <math.h>
 #include <stdlib.h>
+
+#if _SLOWDB_WITH_STRPACK
 #ifndef max
 #define max(a, b) ((a > b) ? a : b)
 #endif
 #define STRPACK_IMPLEMENT
 #include "strpack/strpack.h"
+#endif
 
 #if _SLOWDB_WITH_UNISHOX2
 #include "unishox2/unishox2.h"
@@ -89,6 +90,7 @@ void * slowdb__comp(slowdb__compress algo, void const* src, size_t len, size_t *
             return dest;
         }
 
+#if _SLOWDB_WITH_STRPACK
         case COMPRESS_STRPACK: {
             size_t dest_cap = len;
             void * dest = malloc(dest_cap);
@@ -109,6 +111,7 @@ void * slowdb__comp(slowdb__compress algo, void const* src, size_t len, size_t *
             *actual_len_out = was;
             return dest;
         }
+#endif
 
         // TODO: make safe
 #if _SLOWDB_WITH_UNISHOX2
@@ -165,6 +168,7 @@ void * slowdb__decomp(slowdb__compress algo, void const* src, size_t len, size_t
             return dest;
         }
 
+#if _SLOWDB_WITH_STRPACK
         case COMPRESS_STRPACK: {
             size_t dest_cap = len * 2;
             void * dest = malloc(dest_cap + 1);
@@ -186,6 +190,7 @@ void * slowdb__decomp(slowdb__compress algo, void const* src, size_t len, size_t
             *actual_len_out = was;
             return dest;
         }
+#endif
 
         // TODO: make safe 
 #if _SLOWDB_WITH_UNISHOX2

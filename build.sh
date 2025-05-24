@@ -107,8 +107,9 @@ CFLAGS+=$OLD_CFLAGS
 
 if ! [ -f "$DIR/config.default.h" ]; then
     >&2 echo "# generating default config"
-    echo "// DO NOT EDIT (auto-generated)" > "$DIR/config.default.h"
+    echo "// if this is config.default.h, DO NOT EDIT, AUTO GENERATED" > "$DIR/config.default.h"
     echo "#define _SLOWDB_WITH_LZ4 $(has_include lz4.h -llz4)" >> "$DIR/config.default.h" 
+    echo "#define _SLOWDB_WITH_STRPACK  0" >> "$DIR/config.default.h"
     echo "#define _SLOWDB_WITH_UNISHOX2 0" >> "$DIR/config.default.h"
 fi
 
@@ -130,7 +131,7 @@ $CC $CFLAGS -c -o "$DIR/build/compress.o" "$DIR/src/compress.c" \
     -Wno-constant-conversion -Wno-pointer-sign -Wno-dangling-else 1>&2
 
 if [ "$(get_config _SLOWDB_WITH_UNISHOX2)" = "1" ]; then
-    $CC -c -o "$DIR/build/unishox2.o" "$DIR/src/unishox2/unishox2.c" 1>/&2
+    $CC $CFLAGS -c -o "$DIR/build/unishox2.o" "$DIR/src/unishox2/unishox2.c" 1>&2
 fi
 
 $AR rcs "$DIR/build/slowdb.a" "$DIR/build/"*.o 1>&2
