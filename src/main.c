@@ -9,23 +9,34 @@ void logfn__default(
         size_t cstrln,
         void* userdata)
 {
-    char const* lvlstr;
+    slowdb_log_level min_level = (slowdb_log_level)(intptr_t) userdata;
+    if (level < min_level)
+        return;
 
+    char const* lvlstr;
     switch (level)
     {
         case SLOWDB_LOG_LEVEL__VERBOSE:
-            return;
+            lvlstr = "VERBOSE";
+            break;
 
         case SLOWDB_LOG_LEVEL__WARNING:
-            lvlstr = "WARN ";
+            lvlstr = "WARNING";
             break;
 
         case SLOWDB_LOG_LEVEL__ERROR:
-            lvlstr = "ERROR";
+            lvlstr = " ERROR ";
             break;
     }
 
     fprintf(stderr, "[%s] %s\n", lvlstr, cstr);
+    fflush(stderr);
+}
+
+void slowdb_open_opts_default_logger(slowdb_open_opts* opts, slowdb_log_level min_log_level)
+{
+    opts->logfn = logfn__default;
+    opts->logfn_userdata = (void*)(intptr_t) min_log_level;
 }
 
 void slowdb_open_opts_default(slowdb_open_opts* opts)
@@ -34,10 +45,11 @@ void slowdb_open_opts_default(slowdb_open_opts* opts)
     opts->__internal__magic = OPEN_OPTS_MAGIC;
     opts->__internal__magic2 = OPEN_OPTS_MAGIC;
 
-    opts->logfn = logfn__default;
-    opts->index_num_buckets = 32;
+    slowdb_open_opts_default_logger(opts, SLOWDB_LOG_LEVEL__WARNING);
+    opts->index_num_buckets = 128;
     opts->create_if_not_exist = 1;
     opts->try_recover_header_offsets = 1;
+    opts->min_bytes_for_trunc = 16*1024;
 }
 
 slowdb *slowdb_open(const char *filename)
@@ -55,6 +67,8 @@ static slowdb *slowdb__open_inner(slowdb* db, const char *filename, slowdb_open_
     db->logfn = opts->logfn;
     db->logfn_userdata =
         opts->logfn ? opts->logfn_userdata : 0; // for when the user does GC, and didn't zero logfn_userdata
+
+    db->min_bytes_for_trunc = opts->min_bytes_for_trunc;
 
     int oflags = O_RDWR;
     if (opts->create_if_not_exist)
@@ -78,6 +92,8 @@ static slowdb *slowdb__open_inner(slowdb* db, const char *filename, slowdb_open_
         return NULL;
     }
     memset(db->hashtab, 0, db->hashtab_buckets * sizeof(slowdb_hashtab_bucket));
+
+    int couldnt_full_idx = 0;
 
     slowdb_header header;
     db->next_new = sizeof(header);
@@ -159,9 +175,11 @@ static slowdb *slowdb__open_inner(slowdb* db, const char *filename, slowdb_open_
                 unsigned char * k = (unsigned char *) malloc(eh.key_len);
                 if (k) {
                     safe_fread(k, eh.key_len, db->fp);
-                    int32_t hash = slowdb__hash(k, eh.key_len);
+                    slowdb__hash_t hash = slowdb__hash(k, eh.key_len);
                     free(k);
                     slowdb__add_ent_idx(db, where, hash);
+                } else {
+                    couldnt_full_idx = 1;
                 }
 				db->next_new = where + sizeof(slowdb_ent_header) + eh.data_len + eh.key_len;
             } else
@@ -172,6 +190,11 @@ static slowdb *slowdb__open_inner(slowdb* db, const char *filename, slowdb_open_
 
             safe_fseek_set(db->fp, where + sizeof(slowdb_ent_header) + eh.data_len + eh.key_len);
         }
+    }
+
+    if (couldnt_full_idx)
+    {
+        slowdb__logf(db, SLOWDB_LOG_LEVEL__WARNING, "couldn't fully index DB: not enough memory");
     }
 
     return db;

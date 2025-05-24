@@ -100,6 +100,11 @@ typedef struct {
      */
     int try_recover_header_offsets;
 
+    /**
+     * called for every entry read in slowdb_openx()
+     *
+     * default: none
+     */
     struct {
         /** optional */
         slowdb_open_entcb valid_ent;
@@ -110,10 +115,18 @@ typedef struct {
         void*             invalid_ent_userdata;
     } on_read;
 
+    /**
+     * how many bytes the file needs to be oversized for the file to be truncated (not thaat slow usually)
+     *
+     * default: 16 KiB
+     */
+    size_t min_bytes_for_trunc; 
+
     int __internal__magic2;
 } slowdb_open_opts;
 
 void slowdb_open_opts_default(slowdb_open_opts* opts);
+void slowdb_open_opts_default_logger(slowdb_open_opts* opts, slowdb_log_level min_log_level);
 
 /**
  * Open existing or create new database.

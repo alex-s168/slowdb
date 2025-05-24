@@ -65,6 +65,8 @@ struct slowdb {
 
     slowdb_logfn logfn;
     void* logfn_userdata;
+
+    size_t min_bytes_for_trunc;
 };
 
 static inline slowdb_hashtab_ent* slowdb__ent(slowdb* db, slowdb__ent_id id) {

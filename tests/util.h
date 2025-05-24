@@ -28,7 +28,7 @@ static uint8_t* rand_arr(size_t num, uint8_t min, uint8_t max) {
 	return ptr;
 }
 
-#define require(v) { assert(v); if (!(v)) exit(1); }
+#define require(v) { int _val = !!(v); assert(_val); if (!(_val)) exit(1); }
 
 static void require_eq__impl(size_t a, size_t b, char const* aa, char const* bb) {
     if (a != b) {

@@ -115,10 +115,10 @@ slowdb* slowdb_stats_get(char const* path, slowdb_open_opts const* opts_in, slow
     for (size_t i = 0; i < db->hashtab_buckets; i ++)
     {
         slowdb_hashtab_bucket bucket = db->hashtab[i];
+        out->num_lookup_entries += bucket.count;
 
         for (size_t j = 0; j < bucket.count; j ++) {
             for (size_t k = 0; k < j; k ++) {
-                out->num_lookup_entries = k;
                 if (bucket.items[k].hash == bucket.items[j].hash) {
                     out->num_hash_coll ++;
                 }

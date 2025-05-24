@@ -192,6 +192,8 @@ int main(int argc, char** argv)
 
     slowdb_open_opts opts;
     slowdb_open_opts_default(&opts);
+    slowdb_open_opts_default_logger(&opts, SLOWDB_LOG_LEVEL__VERBOSE);
+
     opts.try_recover_header_offsets = try_recover;
 
     slowdb* db = slowdb_openx(argv[2], &opts);
