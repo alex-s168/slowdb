@@ -3,6 +3,15 @@
 
 char slowdb__header_magic[8] = {':', 's', 'l', 'o', 'w', 'd', 'b', '1'};
 
+__attribute__((noreturn))
+void slowdb__runtime_assert__impl (struct __runtime_assert__backing__argt a)
+{
+    char const* msg = a.message.have ? a.message.value.have : "Assertion failed";
+    fprintf(stderr, "\n%s: %s\n", msg, a.cond);
+    fprintf(stderr, "  In slowdb: %s line %zu\n", a.file, a.line);
+    exit(a.exit_code.have ? a.exit_code.value.have : 1);
+}
+
 void slowdb__logf(slowdb* instance, slowdb_log_level lvl, char const* fmt, ...)
 {
     char buf[256];

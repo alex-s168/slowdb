@@ -8,14 +8,14 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
     size_t found = 0;
     slowdb__iterPotentialEnt(instance, keyhs, entid)
         slowdb_hashtab_ent* ent = slowdb__ent(instance, entid);
-        fseek(instance->fp, ent->where, SEEK_SET);
+        safe_fseek_set(instance->fp, ent->where);
         slowdb_ent_header header;
-        fread(&header, 1, sizeof(header), instance->fp);
+        safe_fread(&header, sizeof(header), instance->fp);
         if (!(header.valid & 1) || header.key_len != keylen)
             continue;
         unsigned char * k = (unsigned char *) malloc(header.key_len);
         if (k == NULL) continue;
-        fread(k, 1, header.key_len, instance->fp);
+        safe_fread(k, header.key_len, instance->fp);
         if (!memcmp(key, k, header.key_len)) {
             found = header.data_len + 1;
             comp = header.compress;
@@ -32,7 +32,7 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
     if (found > 0) {
         res = (unsigned char*) malloc(found);
         if (res == NULL) return NULL;
-        fread(res, 1, found, instance->fp);
+        safe_fread(res, found, instance->fp);
     }
 
     size_t decomp = 0;
@@ -49,28 +49,16 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
 
 static void slowdb__rm(slowdb *instance, size_t where)
 {
-    fseek(instance->fp, where, SEEK_SET);
+    safe_fseek_set(instance->fp, where);
     slowdb_ent_header header;
-    assert( fread(&header, 1, sizeof(header), instance->fp) == sizeof(header) );
+    safe_fread(&header, sizeof(header), instance->fp);
     if (!(header.valid & 1))
         return;
     header.valid = (char) SLOWDB__ENT_MAGIC;
-    fseek(instance->fp, where, SEEK_SET);
-    assert( fwrite(&header, 1, sizeof(header), instance->fp) == sizeof(header) );
+    safe_fseek_set(instance->fp, where);
+    safe_fwrite(&header, sizeof(header), instance->fp);
 
-    size_t next_ent_off = where + sizeof(header) + header.key_len + header.data_len;
-	if (next_ent_off == instance->next_new)
-		instance->next_new = where;
-
-    fseek(instance->fp, next_ent_off, SEEK_SET);
-    fread(&header, 1, sizeof(header), instance->fp);
-
-    if (!(header.valid & 1)) {
-        size_t next_next_ent_off = next_ent_off + sizeof(header) + header.key_len + header.data_len;
-
-        if (next_next_ent_off == instance->next_new)
-            instance->next_new = where;
-    }
+    // TODO: this should try to merge with all following dead entries
 }
 
 // TODO: look into that in future because of compression
@@ -79,14 +67,14 @@ int slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen, 
     slowdb__hash_t keyhs = slowdb__hash(key, keylen);
     slowdb__iterPotentialEnt(instance, keyhs, entid)
         slowdb_hashtab_ent* ent = slowdb__ent(instance, entid);
-        fseek(instance->fp, ent->where, SEEK_SET);
+        safe_fseek_set(instance->fp, ent->where);
         slowdb_ent_header header;
-        fread(&header, 1, sizeof(header), instance->fp);
+        safe_fread(&header, sizeof(header), instance->fp);
         if (!(header.valid & 1) || header.key_len != keylen)
             continue;
         unsigned char * k = (unsigned char *) malloc(header.key_len);
         if (k == NULL) continue;
-        fread(k, 1, header.key_len, instance->fp);
+        safe_fread(k, header.key_len, instance->fp);
         if (!memcmp(key, k, header.key_len)) {
             free(k);
             if (header.compress != COMPRESS_NONE) {
@@ -97,8 +85,8 @@ int slowdb_replaceOrPut(slowdb *instance, const unsigned char *key, int keylen, 
             }
             else {
                 assert(header.data_len == vallen && "cannot slowdb_replaceOrPut() with different vallen than before");
-                fseek(instance->fp, ent->where + sizeof(header) + header.key_len, SEEK_SET);
-                fwrite(val, 1, vallen, instance->fp);
+                safe_fseek_set(instance->fp, ent->where + sizeof(header) + header.key_len);
+                safe_fwrite(val, vallen, instance->fp);
                 return 0;
             }
         }
@@ -114,14 +102,14 @@ int slowdb_remove(slowdb *instance, const unsigned char *key, int keylen)
     slowdb__hash_t keyhs = slowdb__hash(key, keylen);
     slowdb__iterPotentialEnt(instance, keyhs, entid)
         slowdb_hashtab_ent* ent = slowdb__ent(instance, entid);
-        fseek(instance->fp, ent->where, SEEK_SET);
+        safe_fseek_set(instance->fp, ent->where);
         slowdb_ent_header header;
-        fread(&header, 1, sizeof(header), instance->fp);
+        safe_fread(&header, sizeof(header), instance->fp);
         if (!(header.valid & 1) || header.key_len != keylen)
             continue;
         unsigned char * k = (unsigned char *) malloc(header.key_len);
         if (k == NULL) continue;
-        fread(k, 1, header.key_len, instance->fp);
+        safe_fread(k, header.key_len, instance->fp);
         if (!memcmp(key, k, header.key_len)) {
             slowdb__rm(instance, ent->where);
             slowdb__rem_ent_idx(instance, entid);
@@ -158,7 +146,7 @@ int slowdb_put(slowdb *instance, const unsigned char *key, size_t keylen, const 
     if (val == NULL && vallen) return 1;
 
     size_t where = slowdb__get_free_space(instance, keylen, vallen);
-	fseek(instance->fp, where, SEEK_SET);
+	safe_fseek_set(instance->fp, where);
 
     slowdb_ent_header header;
     header.key_len = keylen;
@@ -166,11 +154,11 @@ int slowdb_put(slowdb *instance, const unsigned char *key, size_t keylen, const 
     header.valid = (char) (SLOWDB__ENT_MAGIC | 1);
     header.compress = algo;
 
-    fwrite(&header, 1, sizeof(header), instance->fp);
-    fseek(instance->fp, where + sizeof(header), SEEK_SET);
-    fwrite(key, 1, header.key_len, instance->fp);
-    fseek(instance->fp, where + sizeof(header) + header.key_len, SEEK_SET);
-    fwrite(val, 1, header.data_len, instance->fp);
+    safe_fwrite(&header, sizeof(header), instance->fp);
+    safe_fseek_set(instance->fp, where + sizeof(header));
+    safe_fwrite(key, header.key_len, instance->fp);
+    safe_fseek_set(instance->fp, where + sizeof(header) + header.key_len);
+    safe_fwrite(val, header.data_len, instance->fp);
 
     slowdb__hash_t hash = slowdb__hash(key, header.key_len);
     slowdb__add_ent_idx(instance, where, hash);

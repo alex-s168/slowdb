@@ -104,6 +104,25 @@ void * slowdb__decomp(slowdb__compress algo, void const* src, size_t len, size_t
 
 void slowdb__logf(slowdb* instance, slowdb_log_level lvl, char const* fmt, ...);
 
+struct runtime_assert__opt_msg { int have; union { char const* some; int none; } val; };
+
+#include "runtime_assert_backing.h"
+#define runtime_assert(cond, ...) \
+    if (!(cond)) \
+        runtime_assert__backing(__FILE__, __LINE__, #cond __VA_OPT__(,) __VA_ARGS__)
+
+#define safe_fseek_set(fp, off) \
+    runtime_assert ( 0 == fseek(fp, off, SEEK_SET) )
+
+#define safe_fread(dest, numbytes, fp) \
+    runtime_assert ( numbytes == fread(dest, 1, numbytes, fp) )
+
+#define safe_fwrite(src, numbytes, fp) \
+    runtime_assert ( numbytes == fwrite(src, 1, numbytes, fp) )
+
+#define safe_flush(fp) \
+    runtime_assert ( 0 == fflush(fp) )
+
 #define malloca(dest, size) { if ((size) > 1024) dest = malloc((size)); else { char buf[size]; dest = (void*) (&buf); }  }
 #define freea(var, size)    { if ((size) > 1024) free((var)); }
 

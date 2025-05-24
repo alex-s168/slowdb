@@ -18,8 +18,8 @@ void slowdb_iter_delete(slowdb_iter* iter)
 int slowdb__iter_seek_and_get_header(slowdb_iter* iter, slowdb_ent_header* header)
 {
     slowdb_hashtab_ent* ent = slowdb__ent(iter->_db, iter->_ent_id);
-    fseek(iter->_db->fp, ent->where, SEEK_SET);
-    fread(header, 1, sizeof(slowdb_ent_header), iter->_db->fp);
+    safe_fseek_set(iter->_db->fp, ent->where);
+    safe_fread(header, sizeof(slowdb_ent_header), iter->_db->fp);
     return (header->valid & 1);
 }
 
@@ -30,7 +30,7 @@ unsigned char * slowdb_iter_get_key(slowdb_iter* iter, int* lenout)
 
     unsigned char * k = (unsigned char *) malloc(header.key_len);
     if (k == NULL) return NULL;
-    fread(k, 1, header.key_len, iter->_db->fp);
+    safe_fread(k, header.key_len, iter->_db->fp);
     if (lenout) *lenout = header.key_len;
     return k;
 }
@@ -44,7 +44,7 @@ unsigned char * slowdb_iter_get_val(slowdb_iter* iter, int* lenout)
 
     unsigned char * v = (unsigned char *) malloc(header.data_len);
     if (v == NULL) return NULL;
-    fread(v, 1, header.data_len, iter->_db->fp);
+    safe_fread(v, header.data_len, iter->_db->fp);
 
     size_t decomp;
     unsigned char * actual = slowdb__decomp(header.compress, v, header.data_len, &decomp);
