@@ -16,7 +16,13 @@ if ! hash awk 2>/dev/null; then
     exit 1
 fi
 
-DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+DIR=$(dirname "$(realpath $0)")
+
+if ! [ -f "$DIR/build.sh" ]; then
+    echo the fuck
+    echo $DIR
+    exit 1
+fi
 
 [ -d "$DIR/build" ] && rm -r "$DIR/build"
 mkdir "$DIR/build"
