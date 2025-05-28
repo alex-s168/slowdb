@@ -44,7 +44,10 @@ unsigned char *slowdb_get(slowdb *instance, const unsigned char *key, int keylen
     unsigned char * actual = NULL;
     if (found > 0) {
         actual = slowdb__decomp(comp, res, found, &decomp);
-        if (actual == NULL) return NULL;
+        if (actual == NULL) {
+            free(res);
+            return NULL;
+        }
     }
     if (vallen)
         *vallen = decomp;

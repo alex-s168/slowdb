@@ -103,10 +103,10 @@ static slowdb *slowdb__open_inner(slowdb* db, const char *filename, slowdb_open_
         safe_fwrite(&header, sizeof(header), db->fp);
     } else {
         if ( memcmp(header.magic, slowdb__header_magic, sizeof(slowdb__header_magic)) ){
+            slowdb__logf(db, SLOWDB_LOG_LEVEL__ERROR, "db file magic seq does not match");
             fclose(db->fp);
             free(db->hashtab);
             free(db);
-            slowdb__logf(db, SLOWDB_LOG_LEVEL__ERROR, "db file magic seq does not match");
             return NULL;
         }
 
